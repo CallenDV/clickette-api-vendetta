@@ -21,7 +21,6 @@ export default {
       const [channelId, uploadData] = args;
       
       if (uploadData?.files?.length > 0) {
-        // Prevent the original upload
         args[0] = null;
         
         Promise.all(uploadData.files.map(async (file) => {
