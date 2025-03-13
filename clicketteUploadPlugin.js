@@ -1,75 +1,112 @@
-import { registerCommand } from "@vendetta/commands";
-import { showToast } from "@vendetta/ui";
+import { findByProps } from "@vendetta/metro";
+import { before } from "@vendetta/patcher";
+import { showToast } from "@vendetta/ui/toasts";
 import { storage } from "@vendetta/plugin";
 
-// Default API URL
-const API_URL = "https://clickette.net/api/upload";
+if (!storage.apiKey) {
+  storage.apiKey = ""; 
+}
 
-// Plugin settings to store the API token
-if (!storage.apiToken) storage.apiToken = ""; // Initialize if not set
+const MessageActions = findByProps("sendMessage", "receiveMessage");
+const UploadManager = findByProps("upload", "cancel");
 
-// Create a settings option for adding the API token
-export const settings = [
-  {
-    type: "input",
-    name: "API Token",
-    key: "apiToken",
-    value: storage.apiToken,
-    placeholder: "Enter your Clickette API token",
-    onChange: (value) => {
-      storage.apiToken = value;
-      showToast("API token updated!", "success");
-    },
+export default {
+  name: "Clickette Uploader",
+  description: "Uploads files to clickette.org instead of Discord CDN",
+  authors: [{ name: "CheeseDev" }],
+  version: "2.0.0",
+  
+  onLoad: () => {
+    const uploadPatch = before("upload", UploadManager, (args) => {
+      const [channelId, uploadData] = args;
+      
+      if (uploadData?.files?.length > 0) {
+        // Prevent the original upload
+        args[0] = null;
+        
+        Promise.all(uploadData.files.map(async (file) => {
+          try {
+            showToast("Uploading to clickette.org...");
+            
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            if (!storage.apiKey) {
+              showToast("Please set your clickette.org API key in plugin settings!");
+              return;
+            }
+            
+            const response = await fetch("https://clickette.org/api/upload", {
+              method: "POST",
+              headers: {
+                "Authorization": storage.apiKey ? `Bearer ${storage.apiKey}` : undefined
+                "Content-Type": "multipart/form-data"
+              },
+              body: formData
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Upload failed with status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            const fileUrl = data.resource?.url || 
+                           `https://clickette.org/r/${data.resource?.fileName || data.fileName}`;
+            
+            console.log("Upload successful:", data);
+            
+            MessageActions.sendMessage(channelId, {
+              content: fileUrl,
+              tts: false,
+              invalidEmojis: [],
+              validNonShortcutEmojis: []
+            });
+            
+            showToast("File uploaded to clickette.org!");
+          } catch (error) {
+            console.error("Upload error:", error);
+            showToast(`Upload failed: ${error.message}`);
+          }
+        }));
+        
+        return args;
+      }
+    });
+    
+    return () => {
+      uploadPatch();
+    };
   },
-];
-
-// Register command for uploading a file
-registerCommand({
-  name: "upload",
-  description: "Upload a file to Clickette using Zipline.",
-  options: [
-    {
-      type: "attachment",
-      name: "file",
-      description: "File to upload",
-      required: true,
-    },
-    {
-      type: "string",
-      name: "password",
-      description: "Optional password for file protection",
-      required: false,
-    },
-  ],
-  execute: async (args) => {
-    const { file, password } = args;
-
-    // Check if API token is set
-    if (!storage.apiToken) {
-      showToast("API token not set. Go to settings to add it.", "error");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-    if (password) formData.append("password", password);
-
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${storage.apiToken}`,
-        },
-      });
-
-      if (!response.ok) throw new Error("Failed to upload file.");
-
-      const result = await response.json();
-      const fileUrls = result.files.join(", ");
-      showToast(`File uploaded! URLs: ${fileUrls}`, "success");
-    } catch (error) {
-      showToast(`Error: ${error.message}`, "error");
-    }
-  },
-});
+  
+  settings: () => {
+    return [
+      {
+        type: "input",
+        title: "API Key",
+        placeholder: "Enter your clickette.org API key",
+        value: storage.apiKey,
+        onChange: (value) => {
+          storage.apiKey = value;
+        }
+      },
+      {
+        type: "header",
+        title: "Plugin Information"
+      },
+      {
+        type: "text",
+        title: "About",
+        content: "This plugin redirects file uploads to clickette.org instead of Discord's CDN. After uploading, it posts the file link as a message."
+      },
+      {
+        type: "button",
+        title: "Get API Key",
+        onClick: () => {
+          const InAppBrowser = findByProps("openURL");
+          InAppBrowser.openURL("https://clickette.org/dashboard");
+        }
+      }
+    ];
+  }
+};
