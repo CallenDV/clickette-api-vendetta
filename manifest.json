@@ -1,7 +1,11 @@
 {
   "name": "Clickette Upload Plugin",
   "description": "Upload files to Clickette using a Vendetta plugin.",
-  "author": "CheeseDev",
-  "version": "1.0.0",
-  "commands": ["clicketteUploadPlugin.js"]
+  "authors": [
+    {
+      "name": "CheeseDev",
+      "id": ".cheesedev."
+    }
+  ],
+  "main": "clicketteUploadPlugin.js"
 }
