@@ -1,6 +1,6 @@
 {
   "name": "Clickette Upload Plugin",
-  "description": "Upload files to Clickette using a Vendetta plugin.",
+  "description": "Uploads files to clickette.org instead of Discord CDN",
   "authors": [
     {
       "name": "CheeseDev",
