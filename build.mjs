@@ -56,7 +56,7 @@ const plugins = [
     }
 ];
 
-const PLUGIN_NAME = "clickette-uploader";
+const PLUGIN_NAME = "clickette-api-vendetta";
 const PLUGIN_ENTRY = "clicketteUploadPlugin.js";
 const OUTPUT_DIR = "./dist";
 
